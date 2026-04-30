@@ -1,0 +1,14 @@
+# Nim build artifacts
+nimcache/
+*.nim.cfg.bak
+result
+result-*
+
+# Compiled tests
+tests/test_*
+!tests/test_*.nim
+!tests/test_*.nim.cfg
+
+# Editor
+.envrc.local
+*.swp
