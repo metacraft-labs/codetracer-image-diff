@@ -30,7 +30,9 @@ Milestone status:
 
 ## Status
 
-Bootstrap (the library milestone) pending.
+the library milestone (library bootstrap) implemented: vendored FLIP.h v1.7, public
+`flip(...)` and `renderFlipPng(...)` Nim API, four passing tests
+(identical / different / subpixel-shift / PNG round-trip).
 
 ## Citation
 

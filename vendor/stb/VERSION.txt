@@ -1,0 +1,18 @@
+Vendored from https://github.com/nothings/stb
+Repository commit: 31c1ad37456438565541f4919958214b6e762fb4
+File version: stb_image_write.h v1.16
+
+Files copied:
+  - stb_image_write.h    (single-header C library; #define
+                          STB_IMAGE_WRITE_IMPLEMENTATION in exactly
+                          one translation unit to instantiate the
+                          implementation — done in
+                          src/image_diff/png_writer.nim via {.emit.})
+  - LICENSE              (dual public-domain / MIT)
+
+Used by src/image_diff/png_writer.nim to render the FLIP error map as
+a colour-mapped PNG for human inspection. We picked stb_image_write
+over libpng+pkg-config because (1) it has no runtime dependency,
+(2) it is tiny (~70 KB single header), and (3) the rest of the
+CodeTracer toolchain already uses similar single-header C libraries
+(QOI in a sibling codec library).
