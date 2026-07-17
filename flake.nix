@@ -1,13 +1,6 @@
 {
   description = "codetracer-image-diff — perceptual image diff for CodeTracer visual-replay (NVIDIA FLIP CPU build)";
 
-  nixConfig = {
-    extra-substituters = [ "https://cache.metacraft-labs.com/metacraft-codetracer" ];
-    extra-trusted-public-keys = [
-      "metacraft-codetracer:9OV9wCDX560bt5/MrD4dlqnPpCitAEjpoqhNfQpWY3U="
-    ];
-  };
-
   inputs = {
     codetracer-toolchains.url = "github:metacraft-labs/nix-codetracer-toolchains";
     nixpkgs.follows = "codetracer-toolchains/nixpkgs";
