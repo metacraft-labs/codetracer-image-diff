@@ -16,3 +16,6 @@ tests/output/
 .direnv/
 .envrc.local
 *.swp
+
+# Repro development environment cache
+.repro/
