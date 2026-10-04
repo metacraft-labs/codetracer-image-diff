@@ -10,6 +10,7 @@ backend       = "cpp"
 requires "nim >= 2.2.0"
 
 task test, "Run all tests":
+  exec "nim c -r --hints:off tests/test_nimcache_is_worktree_local.nim"
   exec "nim cpp -d:release -p:src -r tests/test_flip_identical.nim"
   exec "nim cpp -d:release -p:src -r tests/test_flip_different.nim"
   exec "nim cpp -d:release -p:src -r tests/test_flip_subpixel.nim"

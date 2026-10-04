@@ -3,7 +3,7 @@ schema = "reprobuild.solved-graph-lock.v2"
 [lock]
 platform = "amd64-linux"
 optimal = false
-inputs_digest = "fnv1a64:42547496bd5f547f"
+inputs_digest = "fnv1a64:14640559d7a6a87f"
 variants = []
-packages = [{ name = "gcc", version = "12.0.0", source = "gcc" }, { name = "image_diff", version = "0.1.0", source = "image_diff" }, { name = "nim", version = "2.2.0", source = "nim" }]
-deps = [{ name = "codetracer-image-diff", path = ".", coord_kind = "vcs", url = "", ref = "integration-branch", revision = "2710aa2e45f1d97818b439d76d722664cbde62aa", integrity = "git-sha1:2710aa2e45f1d97818b439d76d722664cbde62aa", version = "", visibility = "public", participation = "", depends = "", groups = "" }]
+packages = [{ name = "gcc", version = "12.0.0", source = "gcc", selection = "selected" }, { name = "image_diff", version = "0.1.0", source = "image_diff", selection = "selected" }, { name = "nim", version = "2.2.0", source = "nim", selection = "selected" }]
+deps = [{ name = "codetracer-image-diff", path = ".", coord_kind = "vcs", url = "https://github.com/metacraft-labs/codetracer-image-diff", ref = "dev", revision = "ed4549ef603fdd17315615f505fa1633a633cba8", integrity = "git-sha1:ed4549ef603fdd17315615f505fa1633a633cba8", version = "", visibility = "public", participation = "", depends = "", tags = "" }]
