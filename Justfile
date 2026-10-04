@@ -8,7 +8,11 @@ default:
 build:
     nim cpp --noLinking -p:src src/image_diff.nim
 
-# Run the full test suite (release-mode, all four test files).
+# Owning lint is the existing real library compiler check; it creates no
+# shipping binary. Formatting is checked by the complete portable hook set.
+lint: build
+
+# Run all five test files: original four release profiles and locality debug.
 test:
     nimble test
 

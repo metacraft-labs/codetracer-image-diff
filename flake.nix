@@ -38,6 +38,15 @@
         {
           devShells.default = pkgs.mkShell {
             packages = [
+              # Tools for the complete committed portable hook rules.
+              pkgs.pre-commit
+              pkgs.uv
+              pkgs.git
+              pkgs.editorconfig-checker
+              pkgs.nixfmt-rfc-style
+              pkgs.nodePackages.prettier
+              pkgs.opentofu
+
               # Nim toolchain
               toolchainsPkgs.nim-2_2
               toolchainsPkgs.nimble
@@ -69,17 +78,19 @@
           # CI.
           apps.default = {
             type = "app";
-            program = toString (pkgs.writeShellScript "image-diff-test" ''
-              export PATH="${
-                lib.makeBinPath [
-                  toolchainsPkgs.nim-2_2
-                  toolchainsPkgs.nimble
-                  pkgs.pkg-config
-                  pkgs.gcc
-                ]
-              }:$PATH"
-              exec nimble test
-            '');
+            program = toString (
+              pkgs.writeShellScript "image-diff-test" ''
+                export PATH="${
+                  lib.makeBinPath [
+                    toolchainsPkgs.nim-2_2
+                    toolchainsPkgs.nimble
+                    pkgs.pkg-config
+                    pkgs.gcc
+                  ]
+                }:$PATH"
+                exec nimble test
+              ''
+            );
           };
         };
     };
