@@ -42,6 +42,7 @@
               pkgs.pre-commit
               pkgs.uv
               pkgs.git
+              pkgs.bash
               pkgs.editorconfig-checker
               pkgs.nixfmt-rfc-style
               pkgs.nodePackages.prettier
