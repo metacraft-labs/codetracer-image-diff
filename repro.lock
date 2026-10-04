@@ -6,4 +6,4 @@ optimal = false
 inputs_digest = "fnv1a64:14640559d7a6a87f"
 variants = []
 packages = [{ name = "gcc", version = "12.0.0", source = "gcc", selection = "selected" }, { name = "image_diff", version = "0.1.0", source = "image_diff", selection = "selected" }, { name = "nim", version = "2.2.0", source = "nim", selection = "selected" }]
-deps = [{ name = "codetracer-image-diff", path = ".", coord_kind = "vcs", url = "https://github.com/metacraft-labs/codetracer-image-diff", ref = "agents-to-dev-2026-10-04", revision = "2844866609a2b87c78d82d2ff4b1e47a5ce2bdf7", integrity = "git-sha1:2844866609a2b87c78d82d2ff4b1e47a5ce2bdf7", version = "", visibility = "public", participation = "", depends = "", tags = "" }]
+deps = [{ name = "codetracer-image-diff", path = ".", coord_kind = "vcs", url = "https://github.com/metacraft-labs/codetracer-image-diff", ref = "agents-to-dev-2026-10-04", revision = "cfc652e520600fa6a9bab4525b8e905770ab8346", integrity = "git-sha1:cfc652e520600fa6a9bab4525b8e905770ab8346", version = "", visibility = "public", participation = "", depends = "", tags = "" }]
