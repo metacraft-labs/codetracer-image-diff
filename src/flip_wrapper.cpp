@@ -72,9 +72,9 @@ inline void srgbBufferToLinearFloat(const unsigned char *src,
 } // namespace
 
 extern "C" int ct_flip_compute(const unsigned char *reference,
-                               const unsigned char *candidate,
-                               int width, int height, int channels,
-                               float **out_error_map) {
+                                const unsigned char *candidate,
+                                int width, int height, int channels,
+                                float **out_error_map) {
     if (out_error_map == nullptr) return 1;
     *out_error_map = nullptr;
 

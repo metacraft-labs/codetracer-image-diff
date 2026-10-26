@@ -36,7 +36,7 @@
 ##   closure (each execute edge transitively depends on its build edge).
 ##
 ## **Module search path + backend + compile flags.** codetracer-image-diff
-## ships no ``config.nims`` / ``nim.cfg``; its ``Justfile`` / nimble ``test``
+## ships a worktree-local ``config.nims``; its ``Justfile`` / nimble ``test``
 ## task supply ``-p:src`` (``--path:src``) and ``-d:release`` on every compile.
 ## Each BUILD edge threads ``paths = @["src"]`` (load-bearing — ``import
 ## ../src/image_diff`` resolves from the compiled file's own relative import,
@@ -127,7 +127,36 @@ const imageDiffTestSpecs: seq[ImageDiffTestSpec] = @[
     binary: "build/test-bin/test_flip_subpixel"),
   ImageDiffTestSpec(source: "tests/test_flip_png.nim",
     binary: "build/test-bin/test_flip_png"),
+  ImageDiffTestSpec(source: "tests/test_nimcache_is_worktree_local.nim",
+    binary: "build/test-bin/test_nimcache_is_worktree_local"),
 ]
+
+## The canonical four FLIP tests require Nim's C++ backend. The standard
+## unittest builder selects C, so this owning constructor records the real
+## registered Nim cpp call and returns its existing typed binary handle.
+proc buildCppImageTest(source, binary, stem: string): BuildNimUnittestBuildEdge =
+  let call = publicCliCall("nim", "nim", "cpp", "image_diff.cpp_build", @[
+    cliArg(name = "threadsOn", value = true, alias = "--threads:on"),
+    cliArg(name = "hintsOff", value = true, alias = "--hints:off"),
+    cliArg(name = "warningsOff", value = true, alias = "--warnings:off"),
+    cliArg(name = "defines", value = "release", alias = "-d:", format = cafConcat),
+    cliArg(name = "paths", value = "src", alias = "--path:", format = cafConcat),
+    cliArg(name = "nimcache", value = "build/nimcache/" & stem,
+      alias = "--nimcache:", format = cafConcat),
+    outputArg(name = "output", value = binary, alias = "--out:", format = cafConcat),
+    inputArg(name = "source", value = source, kind = cpkPositional, position = 0)])
+  result.action = buildAction("image_diff.test_build." & stem, call,
+    inputs = @["src", "tests", "vendor", "config.nims", "codetracer_image_diff.nimble"],
+    outputs = @[binary], dependencyPolicy = automaticMonitorPolicy())
+  result.testBinary = NimUnittestBinary(path: binary)
+  appendRegisteredActionTypedOutput(result.action.id, "testBinary",
+    @["NimUnittestBinary"], binary)
+  # Preserve the original typed unittest builder's implicit binary selectors.
+  let implicitNames = computeImplicitTargetNames(call, @["output"])
+  if implicitNames.len > 0:
+    setRegisteredActionTargetNames(result.action.id, implicitNames)
+    registerImplicitTargetExports(result.action.id, NimUnittestToolId,
+      implicitNames, "ct_test_nim_unittest.nim", 0)
 
 package image_diff:
   devEnv:
@@ -137,16 +166,15 @@ package image_diff:
   defaultToolProvisioning "path"
 
   uses:
-    # Toolchain floor — the PATH-resolvable binaries the build needs. ``nim``
-    # compiles every test binary (the ``buildNimUnittest.build`` edges below,
-    # matching the nimble file's ``requires "nim >= 2.2.0"``); ``gcc`` is the
-    # C/C++ back-end ``nim`` shells out to — it compiles the generated Nim TU,
-    # the ``{.compile.}``d ``flip_wrapper.cpp`` and the ``{.emit.}``d
-    # ``stb_image_write.h`` (both via the C++ front-end by file extension), and
-    # links the ``-lstdc++`` runtime. Sufficient for the path-mode resolver
-    # under ``nix develop``.
+    # Registered compiler identities match the owning native Nim configuration.
+    # Nim compiles the complete corpus, including vendored C/C++ backends.
+    # Native Nim selects Clang on Darwin and GCC elsewhere; the pinned
+    # compiler config governs both C and vendored C++ compilation.
     "nim >=2.2 <3.0"
-    "gcc >=12"
+    when defined(macosx):
+      "clang >=15"
+    else:
+      "gcc >=12"
 
   # Library declaration — the ``src/`` tree the tests put on ``--path`` is
   # importable when this package is consumed via ``uses: "image_diff"``. The
@@ -189,13 +217,18 @@ package image_diff:
       let stem =
         if lastSlash >= 0: binary[lastSlash + 1 .. ^1]
         else: binary
-      let edge = buildNimUnittest.build(
-        source = source,
-        binary = binary,
-        defines = @["release"],
-        paths = @["src"],
-        extraInputs = @["src"],
-        actionId = "image_diff.test_build." & stem)
+      let edge =
+        if source == "tests/test_nimcache_is_worktree_local.nim":
+          buildNimUnittest.build(source = source, binary = binary,
+            paths = @["src"], actionId = "image_diff.test_build." & stem,
+            extraInputs = @["src", "tests", "vendor", "config.nims", "codetracer_image_diff.nimble"])
+        else:
+          buildCppImageTest(source, binary, stem)
+      appendRegisteredActionToolIdentityRefs(edge.action.id, @["nim"])
+      when defined(macosx):
+        appendRegisteredActionToolIdentityRefs(edge.action.id, @["clang"])
+      else:
+        appendRegisteredActionToolIdentityRefs(edge.action.id, @["gcc"])
       buildActions.add(edge.action)
       # ``registerImplicitName = false`` because the BUILD edge already owns
       # the binary basename as the implicit target name; the explicit
@@ -203,7 +236,12 @@ package image_diff:
       # reprobuild's ``repro.nim`` / the sibling leaf recipes).
       let executeEdge = edge.testBinary.run(
         actionId = "image_diff.test_execute." & stem,
-        registerImplicitName = false)
+        registerImplicitName = false,
+        after = @[edge.action],
+        extraInputs = (if source == "tests/test_nimcache_is_worktree_local.nim":
+          @["src", "tests", "vendor", "config.nims", "codetracer_image_diff.nimble"] else: @[]))
+      if source == "tests/test_nimcache_is_worktree_local.nim":
+        appendRegisteredActionToolIdentityRefs(executeEdge.id, @["nim"])
       executeActions.add(executeEdge)
 
     for spec in imageDiffTestSpecs:

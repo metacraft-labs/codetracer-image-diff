@@ -2,7 +2,7 @@
 
 Neighborhood-aware visual-diff for `CodeTracer visual-replay`'s
 software-vs-hardware integration tests. Wraps NVIDIA's FLIP
-(*A Difference Evaluator for Alternating Images*, Andersson et al.,
+(_A Difference Evaluator for Alternating Images_, Andersson et al.,
 HPG 2020) — a perceptual metric that combines a contrast-sensitivity
 pass and a feature-detection pass to produce per-pixel error in
 [0, 1] that tolerates rasterizer-level noise without false-passing
@@ -37,8 +37,8 @@ the library milestone (library bootstrap) implemented: vendored FLIP.h v1.7, pub
 ## Citation
 
 Andersson, P. and Nilsson, J. and Akenine-Möller, T. and Oskarsson, M.
-and Åström, K. and Fairchild, M. D., *FLIP: A Difference Evaluator
-for Alternating Images*, Proceedings of the ACM on Computer Graphics
+and Åström, K. and Fairchild, M. D., _FLIP: A Difference Evaluator
+for Alternating Images_, Proceedings of the ACM on Computer Graphics
 and Interactive Techniques, 3 (2), 2020.
 https://research.nvidia.com/publication/2020-07_FLIP
 

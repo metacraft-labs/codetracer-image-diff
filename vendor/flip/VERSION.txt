@@ -4,30 +4,30 @@ Tag: FLIP v1.7
 
 Files copied (CPU-only subset):
   - src/cpp/FLIP.h   (single-header C++ FLIP reference implementation,
-                     includes the LDR + HDR evaluator, image class, magma
-                     colour map, etc. The CUDA paths are gated behind
-                     #ifdef FLIP_ENABLE_CUDA which we never define.)
+                      includes the LDR + HDR evaluator, image class, magma
+                      colour map, etc. The CUDA paths are gated behind
+                      #ifdef FLIP_ENABLE_CUDA which we never define.)
   - LICENSE          (BSD-3-Clause)
 
 Files intentionally omitted:
   - src/cpp/tool/    (FLIP-tool.cpp, FLIPToolHelpers.h, commandline.h,
-                     filename.h, imagehelpers.h, pooling.h — the
-                     standalone CLI tool, irrelevant for library use)
+                      filename.h, imagehelpers.h, pooling.h — the
+                      standalone CLI tool, irrelevant for library use)
   - src/cpp/tool/stb_image*.h, tinyexr.h
-                     (image-on-disk I/O — we vendor stb_image_write
-                     separately under vendor/stb/ for our PNG output and
-                     don't need the EXR/HDR readers)
+                      (image-on-disk I/O — we vendor stb_image_write
+                      separately under vendor/stb/ for our PNG output and
+                      don't need the EXR/HDR readers)
   - src/cpp/FLIP-tool.cu, src/cpp/FLIP.sln, src/cpp/CMakeLists.txt
-                     (CUDA build, MSVC solution, build glue)
+                      (CUDA build, MSVC solution, build glue)
   - src/cuda/, src/python/, src/pytorch/, src/flip_evaluator/,
     src/tests/, src/nanobindFLIP.cpp
-                     (other-language bindings and the CUDA path)
+                      (other-language bindings and the CUDA path)
   - images/, misc/, .github/, BUILD.bazel, MODULE.bazel, pyproject.toml,
     CMakeLists.txt    (top-level repo glue)
 
-Patches applied: none. FLIP.h compiles cleanly under g++ with
+Patches applied: leading-whitespace formatting only. FLIP.h compiles under g++ with
 -std=c++17 when FLIP_ENABLE_CUDA is undefined; see vendor/flip/PATCHES.md
-(empty placeholder).
+(exact formatting patch).
 
 Build integration: src/image_diff/flip_backend.nim instantiates this
 header by emitting a single .cpp translation unit (src/flip_wrapper.cpp)
