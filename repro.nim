@@ -135,6 +135,17 @@ const imageDiffTestSpecs: seq[ImageDiffTestSpec] = @[
 ## unittest builder selects C, so this owning constructor records the real
 ## registered Nim cpp call and returns its existing typed binary handle.
 proc buildCppImageTest(source, binary, stem: string): BuildNimUnittestBuildEdge =
+  # On Windows ``nim cpp --out:foo`` writes ``foo.exe``. The edge must declare
+  # the file Nim actually writes: the engine fails a cacheable action whose
+  # declared output is absent, and the execute edge's typed ``binary`` input
+  # must name a file this edge produces. So the suffix is applied once, here,
+  # and the ``--out:`` argument, the declared output, the typed output and the
+  # runner's binary path all use the same spelling. This follows the
+  # ``effectiveBinary`` rule in reprobuild's ``nim.c`` and the Windows branch
+  # of ``buildNimUnittest.build``. On Linux and macOS the path is unchanged.
+  let binary =
+    when defined(windows): binary & ".exe"
+    else: binary
   let call = publicCliCall("nim", "nim", "cpp", "image_diff.cpp_build", @[
     cliArg(name = "threadsOn", value = true, alias = "--threads:on"),
     cliArg(name = "hintsOff", value = true, alias = "--hints:off"),
