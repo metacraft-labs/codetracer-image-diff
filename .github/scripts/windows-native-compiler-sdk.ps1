@@ -6,11 +6,11 @@ if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString
 if (-not (Get-Command Get-FileHash -ErrorAction SilentlyContinue)) {
   throw 'The pinned supported installer requires the native PowerShell Get-FileHash cmdlet.'
 }
-$revision = '76659f5730ecf698b1963c656494d2cb66eb256d'
+$revision = '9dbf4e710d7cc0b9a79a4bcd54c931afb6849dd0'
 $files = [ordered]@{
-  'toolchain-utils.ps1' = 'd1cb869b8c0652cbd96e362bc88d23b46385e6468be654adf0de8a276772979b'
-  'ensure-gcc.ps1' = '96c893eb18253469092960a548858bbaa3da3ea0cc53fa3a47478256f73176eb'
-  'toolchain-versions.env' = '9bde26a453e5af29512b44dd04156e90a4a4df886dd15acbc896ff84f22ea5cd'
+  'toolchain-utils.ps1' = 'c5fae914b7280cd06ea74693317096118c2284436d55724647024a1129dd2403'
+  'ensure-gcc.ps1' = 'e9f705dcdc2a30c343acfdc274530161d700c1c203e959c6ec59774bc47ee7d6'
+  'toolchain-versions.env' = 'f7b883c72f2490c8d43f76a3c8ba347636445af5d9fb16744b9e73aef39f6619'
 }
 $root = Join-Path $env:RUNNER_TEMP ('image-native-sdk-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $root | Out-Null
