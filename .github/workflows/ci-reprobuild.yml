@@ -104,6 +104,22 @@ jobs:
           # is empty.
           repro-runquota-pin: "9818dc0c90be8ba7993424a7bbfbb6e009ffa965"
           gh-token: ${{ steps.ci_token.outputs.token }}
+          # The same App as the mint step above. With both inputs the action
+          # starts its job credential broker, which re-mints the Nix GitHub
+          # token about every 40 minutes. The installation token minted at job
+          # start lives one hour, and the source build of repro-build-pin can
+          # outlast it on a loaded host: in codetracer-image-diff job
+          # 131547330733 (linux-x64, PR #9) the token was minted at 23:33,
+          # this step built reprobuild from 23:46 to 00:52, and its first
+          # `repro exec` then failed fetching the nixpkgs tarball with
+          # `HTTP error 401` ("Bad credentials"). The later steps use the job's
+          # GitHub credential only through Nix (github: flake inputs and
+          # --tool-provisioning=nix), which the broker covers, and run no Git
+          # fetch that the frozen GIT_CONFIG_* credential would fail, so they
+          # need no refresh-build-auth. Windows legs install the release
+          # instead of building, and the action skips the broker there.
+          app-id: ${{ secrets.CI_TOKEN_PROVIDER_APP_ID }}
+          app-private-key: ${{ secrets.CI_TOKEN_PROVIDER_PRIVATE_KEY }}
 
       - name: Assert measured Unix Repro artifacts
         if: runner.os != 'Windows'
