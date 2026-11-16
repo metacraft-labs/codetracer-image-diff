@@ -84,29 +84,27 @@ jobs:
 
       - name: Setup dev env (reprobuild flavor)
         # Source mode supplies the verified CLI and staged Nix helper.
-        # The pin is reprobuild v0.2.24 as released: 7c670d24 is the commit the
-        # v0.2.24 release assets were built from (release run 43218423379). The
-        # tag was moved to a later commit after that run, so it no longer names
-        # the build the Windows legs install.
         uses: metacraft-labs/metacraft-github-actions/setup-dev-env@dev
+        env:
+          WINDOWS_DIY_ARCH_OVERRIDE: ${{ runner.os == 'Windows' && runner.arch == 'ARM64' && 'x64' || '' }}
         with:
           env-flavor: reprobuild
-          repro-from-source: ${{ runner.os != 'Windows' && 'true' || 'false' }}
-          repro-build-pin: "7c670d248b936188f8aad689f32bb7e64522c5ac"
-          # Windows legs install this release instead of building the pin
-          # (both arm64 and x64 install its windows-x86_64 archive). Keep it
-          # the tag of repro-build-pin so every leg runs the same revision;
-          # the default `latest` moves with each release.
-          repro-version: "v0.2.24"
+          # The Reprobuild engine is the fleet pin: the `reprobuild` input of
+          # nixos-modules' (metacraft-labs/devops-modules) flake.lock. Every leg builds that revision from
+          # source (Windows ARM64 as x64 under emulation), so CI runs the
+          # engine the fleet runs; a release install would not. The companion
+          # pins are that revision's own flake.lock entries. These literals
+          # follow nixos-modules and are replaced when the pin moves.
           # The source build overrides reprobuild's `runquota-src` with a clone
-          # of this ref (default `dev`). Keep it equal to the runquota-src rev
-          # in the pinned reprobuild's flake.lock, so the build uses the
-          # RunQuota that reprobuild was locked against rather than whatever
-          # `dev` holds (v0.2.19+ needs runquota's `directoryResolvesWithin`).
-          # v0.2.24's flake.lock pins runquota-src at 37192074; move this value
-          # with repro-build-pin. io-mon-src stays on that flake lock (8fd53d43
-          # at v0.2.24) while `repro-posix-io-mon-pin` is empty.
-          repro-runquota-pin: "371920744e0b94f580fcb0e511e284b99f99e80c"
+          # of repro-runquota-pin (default `dev`), so that pin must equal the
+          # runquota-src rev in the pinned reprobuild's flake.lock.
+          # `repro-posix-io-mon-pin` stays empty, which keeps io-mon-src on
+          # that flake lock for the POSIX build.
+          repro-from-source: "true"
+          repro-build-pin: "84b459adda91535f0b89424dfc95aa34bfa67a32"
+          repro-runquota-pin: "f9e1a4d3f3ba7840aefe56883127653af9c5a608"
+          repro-io-mon-pin: "35829647d603b481276d2632b39ec2a9ce3625b2"
+          repro-stackable-hooks-pin: "c1d55ce33fb2a29e4cf8d8bdbe1713f355370d0a"
           gh-token: ${{ steps.ci_token.outputs.token }}
           # The same App as the mint step above. With both inputs the action
           # starts its job credential broker, which re-mints the Nix GitHub
@@ -120,8 +118,8 @@ jobs:
           # GitHub credential only through Nix (github: flake inputs and
           # --tool-provisioning=nix), which the broker covers, and run no Git
           # fetch that the frozen GIT_CONFIG_* credential would fail, so they
-          # need no refresh-build-auth. Windows legs install the release
-          # instead of building, and the action skips the broker there.
+          # need no refresh-build-auth. The action does not run the broker on
+          # Windows legs.
           app-id: ${{ secrets.CI_TOKEN_PROVIDER_APP_ID }}
           app-private-key: ${{ secrets.CI_TOKEN_PROVIDER_PRIVATE_KEY }}
 
@@ -129,7 +127,7 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           set -euo pipefail
-          test "$(git -C .reprobuild-src rev-parse HEAD)" = 7c670d248b936188f8aad689f32bb7e64522c5ac
+          test "$(git -C .reprobuild-src rev-parse HEAD)" = 84b459adda91535f0b89424dfc95aa34bfa67a32
           test -z "$(git -C .reprobuild-src status --porcelain)"
           test "$(command -v repro)" = "$GITHUB_WORKSPACE/.reprobuild-src/build/bin/repro"
           test "${REPROBUILD_NIX_DAEMON_BIN:?missing staged helper}" = "$GITHUB_WORKSPACE/.reprobuild-src/build/bin/reprobuild-nix-daemon"

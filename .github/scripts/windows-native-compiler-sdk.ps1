@@ -6,9 +6,9 @@ if ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString
 if (-not (Get-Command Get-FileHash -ErrorAction SilentlyContinue)) {
   throw 'The pinned supported installer requires the native PowerShell Get-FileHash cmdlet.'
 }
-$revision = '7c670d248b936188f8aad689f32bb7e64522c5ac'
+$revision = '84b459adda91535f0b89424dfc95aa34bfa67a32'
 $files = [ordered]@{
-  'toolchain-utils.ps1' = 'c5fae914b7280cd06ea74693317096118c2284436d55724647024a1129dd2403'
+  'toolchain-utils.ps1' = '82f0192b6c7b35f644bdcc3311f3ac3ac33ebab31938dafd5f9d8ed91568c422'
   'ensure-gcc.ps1' = 'e9f705dcdc2a30c343acfdc274530161d700c1c203e959c6ec59774bc47ee7d6'
   'toolchain-versions.env' = '8a5138e9dcdcbf586414002edf8f2cdb13029f677f46068a57f5235897bda8db'
 }
