@@ -6,9 +6,9 @@
  * with C linkage so Nim's importc can bind it.
  *
  * The wrapper's contract is:
- *   - Input pixels are sRGB-encoded 8-bit bytes (the player's
- *     framebuffers — see an internal design document the snapshot tooling design
- *     §"FLIP has an LDR mode"). Convert to linear-RGB float in [0, 1]
+ *   - Input pixels are sRGB-encoded 8-bit bytes (the replay player's
+ *     framebuffers, which are LDR, so FLIP's LDR mode applies). Convert
+ *     to linear-RGB float in [0, 1]
  *     before handing to FLIP::evaluate, since the upstream LDR path
  *     expects linear RGB internally (see FLIP.h:2237 comment on
  *     LDR_FLIP).

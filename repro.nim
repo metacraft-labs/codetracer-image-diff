@@ -2,7 +2,7 @@
 ##
 ## **Typed-Cross-Project-Deps rollout, Wave-0 leaf.** ``codetracer-image-diff``
 ## is a pure-Nim leaf library — a perceptual image-diff (NVIDIA FLIP CPU
-## build) for CodeTracer visual-replay's software-vs-hardware tests. Its
+## build) for CodeTracer's visual-replay software-vs-hardware tests. Its
 ## importable surface (``src/image_diff.nim`` + ``src/image_diff/*``) wraps a
 ## VENDORED C++ backend (NVIDIA FLIP's single-header ``vendor/flip/FLIP.h`` and
 ## Sean Barrett's ``vendor/stb/stb_image_write.h``), pulled in at compile time
@@ -14,7 +14,7 @@
 ## floor and there is no ``uses: "<sibling>"`` edge.
 ##
 ## A Mode 1 / Mode 3 hybrid (per
-## ``an internal design document``) modelled on the
+## the Reprobuild three-mode convention system) modelled on the
 ## canonical ``runquota/repro.nim`` / ``nim-stackable-hooks/repro.nim`` /
 ## ``nim-libvterm/repro.nim`` / ``nim-pty/repro.nim`` leaf recipes:
 ##
@@ -30,7 +30,7 @@
 ## * Emits, per test file under ``tests/``, a BUILD edge
 ##   (``buildNimUnittest.build``) that compiles ``build/test-bin/<stem>`` and
 ##   an EXECUTE edge (``edge.testBinary.run``) that runs it — the two-edge test
-##   template from ``an internal design document`` §"The test template".
+##   template from the Reprobuild package model.
 ##   BUILD halves collect into ``test-builds``; EXECUTE halves collect into
 ##   ``test`` so ``repro build test`` / ``repro test`` materialise the runnable
 ##   closure (each execute edge transitively depends on its build edge).
