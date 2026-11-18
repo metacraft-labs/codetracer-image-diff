@@ -15,4 +15,5 @@ a colour-mapped PNG for human inspection. We picked stb_image_write
 over libpng+pkg-config because (1) it has no runtime dependency,
 (2) it is tiny (~70 KB single header), and (3) the rest of the
 CodeTracer toolchain already uses similar single-header C libraries
-(QOI in a sibling codec library).
+(for example the QOI codec used elsewhere in the CodeTracer
+toolchain).
