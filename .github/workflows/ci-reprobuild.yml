@@ -86,11 +86,11 @@ jobs:
         with:
           env-flavor: reprobuild
           # The Reprobuild engine is the fleet pin: the `reprobuild` input of
-          # nixos-modules' (metacraft-labs/devops-modules) flake.lock. Every leg builds that revision from
+          # shared fleet flake.lock (metacraft-labs/devops-modules). Every leg builds that revision from
           # source (Windows ARM64 as x64 under emulation), so CI runs the
           # engine the fleet runs; a release install would not. The companion
           # pins are that revision's own flake.lock entries. These literals
-          # follow nixos-modules and are replaced when the pin moves.
+          # follow the fleet lock and are replaced when the pin moves.
           # The source build overrides reprobuild's `runquota-src` with a clone
           # of repro-runquota-pin (default `dev`), so that pin must equal the
           # runquota-src rev in the pinned reprobuild's flake.lock.
