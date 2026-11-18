@@ -1,6 +1,6 @@
 ## tests/test_flip_subpixel.nim
 ##
-## **Primary acceptance signal for the library milestone.**
+## **Primary acceptance signal for the library.**
 ##
 ## A naive per-pixel diff between an image and a 1-pixel-shifted copy
 ## fires loudly along every edge. FLIP, being neighborhood-aware,

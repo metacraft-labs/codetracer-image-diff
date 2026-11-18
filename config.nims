@@ -6,8 +6,8 @@
 ## the project NAME only, and the generated file names inside it do not depend
 ## on the checkout path either.  So two worktrees or clones of this repository
 ## that build the same project at the same time write, compile and link each
-## other's intermediate files.  Measured on 2026-09-26 in a sibling CodeTracer project
-## (fixed there by 271efb265, which this file follows):
+## other's intermediate files.  Measured on 2026-09-26 in a sibling CodeTracer
+## project (fixed there the same way, which this file follows):
 ## ten concurrent builds of two worktrees that differed in a few places gave
 ## four correct binaries, two that exited 0 with the OTHER worktree's code
 ## linked in (one of them a mix of both), two compile failures on
