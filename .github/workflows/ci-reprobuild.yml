@@ -85,22 +85,25 @@ jobs:
           WINDOWS_DIY_ARCH_OVERRIDE: ${{ runner.os == 'Windows' && runner.arch == 'ARM64' && 'x64' || '' }}
         with:
           env-flavor: reprobuild
-          # The Reprobuild engine is the fleet pin: the `reprobuild` input of
-          # shared fleet flake.lock (metacraft-labs/devops-modules). Every leg builds that revision from
-          # source (Windows ARM64 as x64 under emulation), so CI runs the
-          # engine the fleet runs; a release install would not. The companion
-          # pins are that revision's own flake.lock entries. These literals
-          # follow the fleet lock and are replaced when the pin moves.
+          # The Reprobuild engine is reprobuild release v0.2.31 (tag commit
+          # 7618e3cb). Every leg builds that revision from source (Windows
+          # ARM64 as x64 under emulation): the release ships no linux-arm64
+          # bundle, and the Windows source build is what leaves nim and gcc on
+          # PATH for `repro build`'s path mode, which no longer falls back to
+          # an archive or Nix for a tool PATH lacks. The companion pins are
+          # that revision's own flake.lock entries. These literals, and the
+          # revision in .github/scripts/windows-native-compiler-sdk.ps1,
+          # follow reprobuild release v0.2.31.
           # The source build overrides reprobuild's `runquota-src` with a clone
           # of repro-runquota-pin (default `dev`), so that pin must equal the
           # runquota-src rev in the pinned reprobuild's flake.lock.
           # `repro-posix-io-mon-pin` stays empty, which keeps io-mon-src on
           # that flake lock for the POSIX build.
           repro-from-source: "true"
-          repro-build-pin: "84b459adda91535f0b89424dfc95aa34bfa67a32"
-          repro-runquota-pin: "f9e1a4d3f3ba7840aefe56883127653af9c5a608"
-          repro-io-mon-pin: "35829647d603b481276d2632b39ec2a9ce3625b2"
-          repro-stackable-hooks-pin: "c1d55ce33fb2a29e4cf8d8bdbe1713f355370d0a"
+          repro-build-pin: "7618e3cb21ce17f5c86fbd290f501d60d52e9be1"
+          repro-runquota-pin: "6ff973131e7f715f0237cb0f08b8dd16cbeba0dc"
+          repro-io-mon-pin: "8b8faa81bb0cad5d2d91fae80ceaaa7092782ec2"
+          repro-stackable-hooks-pin: "c34e3252d413361a0f250d8921e00c119d30e114"
           gh-token: ${{ steps.ci_token.outputs.token }}
           # The same App as the mint step above. With both inputs the action
           # starts its job credential broker, which re-mints the Nix GitHub
@@ -123,7 +126,7 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           set -euo pipefail
-          test "$(git -C .reprobuild-src rev-parse HEAD)" = 84b459adda91535f0b89424dfc95aa34bfa67a32
+          test "$(git -C .reprobuild-src rev-parse HEAD)" = 7618e3cb21ce17f5c86fbd290f501d60d52e9be1
           test -z "$(git -C .reprobuild-src status --porcelain)"
           test "$(command -v repro)" = "$GITHUB_WORKSPACE/.reprobuild-src/build/bin/repro"
           test "${REPROBUILD_NIX_DAEMON_BIN:?missing staged helper}" = "$GITHUB_WORKSPACE/.reprobuild-src/build/bin/reprobuild-nix-daemon"
