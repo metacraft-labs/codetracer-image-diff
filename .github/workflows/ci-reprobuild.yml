@@ -80,35 +80,23 @@ jobs:
 
       - name: Setup dev env (reprobuild flavor)
         # Source mode supplies the verified CLI and staged Nix helper.
+        id: dev-env
         uses: metacraft-labs/metacraft-github-actions/setup-dev-env@dev
         env:
           WINDOWS_DIY_ARCH_OVERRIDE: ${{ runner.os == 'Windows' && runner.arch == 'ARM64' && 'x64' || '' }}
         with:
           env-flavor: reprobuild
-          # The Reprobuild engine is the fleet pin: `pins/reprobuild.json` in
-          # metacraft-labs/metacraft-github-actions (d1bf1f06, v0.2.34). Every leg
-          # builds that revision from source (Windows ARM64 as x64 under emulation):
-          # there is no linux-arm64 release bundle, and the Windows source build is
-          # what leaves nim and gcc on PATH for `repro build`'s path mode, which does
-          # not fall back to an archive or Nix for a tool PATH lacks. The companion
-          # pins are that revision's own flake.lock entries. These literals, and the
-          # revision in .github/scripts/windows-native-compiler-sdk.ps1, follow that
-          # pin and move with it.
-          # The source build overrides reprobuild's `runquota-src` with a clone
-          # of repro-runquota-pin (default `dev`), so that pin must equal the
-          # runquota-src rev in the pinned reprobuild's flake.lock.
-          # `repro-posix-io-mon-pin` stays empty, which keeps io-mon-src on
-          # that flake lock for the POSIX build.
-          repro-from-source: "true"
-          repro-build-pin: "d1bf1f065aca01b90c3bbdddc57d14e977f49e1a"
-          repro-runquota-pin: "6ff973131e7f715f0237cb0f08b8dd16cbeba0dc"
-          repro-io-mon-pin: "b1c32599f9cd671b150f68de2b21bdc9ae0c42be"
-          repro-stackable-hooks-pin: "c34e3252d413361a0f250d8921e00c119d30e114"
+          # The Reprobuild engine is the fleet pin, the action's default:
+          # `pins/reprobuild.json` in metacraft-labs/metacraft-github-actions,
+          # with the companion revisions that pinned revision locks. Windows
+          # ARM64 runs it as x64 under emulation. The step reports the commit
+          # it installed as `repro-commit`; the Windows x64 compiler SDK
+          # script fetches its toolchain files from that commit.
           gh-token: ${{ steps.ci_token.outputs.token }}
           # The same App as the mint step above. With both inputs the action
           # starts its job credential broker, which re-mints the Nix GitHub
           # token about every 40 minutes. The installation token minted at job
-          # start lives one hour, and the source build of repro-build-pin can
+          # start lives one hour, and the source build of the pin can
           # outlast it on a loaded host: in codetracer-image-diff job
           # 131547330733 (linux-x64, PR #9) the token was minted at 23:33,
           # this step built reprobuild from 23:46 to 00:52, and its first
@@ -123,21 +111,38 @@ jobs:
           app-private-key: ${{ secrets.CI_TOKEN_PROVIDER_PRIVATE_KEY }}
 
       - name: Assert measured Unix Repro artifacts
+        # setup-dev-env reports the engine it installed. It is the pin, not an
+        # override, and a source build (macOS; Linux when the binary cache
+        # misses) is a clean checkout of that commit. A Linux cache hit
+        # installs the pinned commit's Nix package, which has no checkout.
         if: runner.os != 'Windows'
+        env:
+          REPRO_COMMIT: ${{ steps.dev-env.outputs.repro-commit }}
+          REPRO_ORIGIN: ${{ steps.dev-env.outputs.repro-origin }}
+          REPRO_INSTALL_SOURCE: ${{ steps.dev-env.outputs.repro-install-source }}
         run: |
           set -euo pipefail
-          test "$(git -C .reprobuild-src rev-parse HEAD)" = d1bf1f065aca01b90c3bbdddc57d14e977f49e1a
-          test -z "$(git -C .reprobuild-src status --porcelain)"
-          test "$(command -v repro)" = "$GITHUB_WORKSPACE/.reprobuild-src/build/bin/repro"
-          test "${REPROBUILD_NIX_DAEMON_BIN:?missing staged helper}" = "$GITHUB_WORKSPACE/.reprobuild-src/build/bin/reprobuild-nix-daemon"
-          test -x "$REPROBUILD_NIX_DAEMON_BIN"
+          [[ "${REPRO_COMMIT}" =~ ^[0-9a-f]{40}$ ]]
+          test "${REPRO_ORIGIN}" = pin
+          if [ "${REPRO_INSTALL_SOURCE}" = source ]; then
+            test "$(git -C .reprobuild-src rev-parse HEAD)" = "${REPRO_COMMIT}"
+            test -z "$(git -C .reprobuild-src status --porcelain)"
+            test "$(command -v repro)" = "$GITHUB_WORKSPACE/.reprobuild-src/build/bin/repro"
+            test "${REPROBUILD_NIX_DAEMON_BIN:?missing staged helper}" = "$GITHUB_WORKSPACE/.reprobuild-src/build/bin/reprobuild-nix-daemon"
+          fi
+          test -x "${REPROBUILD_NIX_DAEMON_BIN:?missing staged helper}"
           "$REPROBUILD_NIX_DAEMON_BIN" --help
-          printf 'source=%s cli=%s helper=%s\n' "$(git -C .reprobuild-src rev-parse HEAD)" "$(command -v repro)" "$REPROBUILD_NIX_DAEMON_BIN"
+          printf 'commit=%s origin=%s install=%s cli=%s helper=%s\n' "$REPRO_COMMIT" "$REPRO_ORIGIN" "$REPRO_INSTALL_SOURCE" "$(command -v repro)" "$REPROBUILD_NIX_DAEMON_BIN"
           repro --version
 
       - name: Provision the owning native Windows x64 SDK
+        # Fails closed until the toolchain files at the pinned commit have a
+        # reviewed entry in the script.
         if: runner.os == 'Windows' && matrix.arch == 'x64'
         shell: pwsh
+        env:
+          REPRO_COMMIT: ${{ steps.dev-env.outputs.repro-commit }}
+          REPRO_ORIGIN: ${{ steps.dev-env.outputs.repro-origin }}
         run: ./.github/scripts/windows-native-compiler-sdk.ps1
 
       - name: Record native Windows executable provenance
