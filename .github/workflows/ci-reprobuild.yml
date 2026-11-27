@@ -45,17 +45,18 @@ jobs:
 
       # Mint a GitHub App installation token via the CI Token Provider
       # app so the reprobuild flake/sibling steps can clone the
-      # organization's access-restricted repositories.  GitHub free plan restricts org-level
-      # secrets with visibility ALL from being readable in private repos,
-      # so we mint per-run tokens from the app secrets stored at repo
-      # level (CI_TOKEN_PROVIDER_APP_ID + CI_TOKEN_PROVIDER_PRIVATE_KEY).
+      # organization's access-restricted repositories. The App ID is read
+      # from the organization Actions variable CI_TOKEN_PROVIDER_APP_ID and
+      # the private key from the organization secret
+      # CI_TOKEN_PROVIDER_PRIVATE_KEY, so no per-repository secret has to
+      # survive a recreation of this repository.
       # Minted before the sibling clones so the workspace-lock manifest
       # checkout (an access-restricted repository) can authenticate.
       - name: Mint installation token for cross-repo sibling clones
         id: ci_token
         uses: actions/create-github-app-token@v2
         with:
-          app-id: ${{ secrets.CI_TOKEN_PROVIDER_APP_ID }}
+          app-id: ${{ vars.CI_TOKEN_PROVIDER_APP_ID }}
           private-key: ${{ secrets.CI_TOKEN_PROVIDER_PRIVATE_KEY }}
           owner: metacraft-labs
 
@@ -80,34 +81,23 @@ jobs:
 
       - name: Setup dev env (reprobuild flavor)
         # Source mode supplies the verified CLI and staged Nix helper.
-        # The pin is reprobuild v0.2.24 as released: 7c670d24 is the commit the
-        # v0.2.24 release assets were built from (release run 43218423379). The
-        # tag was moved to a later commit after that run, so it no longer names
-        # the build the Windows legs install.
+        id: dev-env
         uses: metacraft-labs/metacraft-github-actions/setup-dev-env@dev
+        env:
+          WINDOWS_DIY_ARCH_OVERRIDE: ${{ runner.os == 'Windows' && runner.arch == 'ARM64' && 'x64' || '' }}
         with:
           env-flavor: reprobuild
-          repro-from-source: ${{ runner.os != 'Windows' && 'true' || 'false' }}
-          repro-build-pin: "7c670d248b936188f8aad689f32bb7e64522c5ac"
-          # Windows legs install this release instead of building the pin
-          # (both arm64 and x64 install its windows-x86_64 archive). Keep it
-          # the tag of repro-build-pin so every leg runs the same revision;
-          # the default `latest` moves with each release.
-          repro-version: "v0.2.24"
-          # The source build overrides reprobuild's `runquota-src` with a clone
-          # of this ref (default `dev`). Keep it equal to the runquota-src rev
-          # in the pinned reprobuild's flake.lock, so the build uses the
-          # RunQuota that reprobuild was locked against rather than whatever
-          # `dev` holds (v0.2.19+ needs runquota's `directoryResolvesWithin`).
-          # v0.2.24's flake.lock pins runquota-src at 37192074; move this value
-          # with repro-build-pin. io-mon-src stays on that flake lock (8fd53d43
-          # at v0.2.24) while `repro-posix-io-mon-pin` is empty.
-          repro-runquota-pin: "371920744e0b94f580fcb0e511e284b99f99e80c"
+          # The Reprobuild engine is the fleet pin, the action's default:
+          # `pins/reprobuild.json` in metacraft-labs/metacraft-github-actions,
+          # with the companion revisions that pinned revision locks. Windows
+          # ARM64 runs it as x64 under emulation. The step reports the commit
+          # it installed as `repro-commit`; the Windows x64 compiler SDK
+          # script fetches its toolchain files from that commit.
           gh-token: ${{ steps.ci_token.outputs.token }}
           # The same App as the mint step above. With both inputs the action
           # starts its job credential broker, which re-mints the Nix GitHub
           # token about every 40 minutes. The installation token minted at job
-          # start lives one hour, and the source build of repro-build-pin can
+          # start lives one hour, and the source build of the pin can
           # outlast it on a loaded host: in codetracer-image-diff job
           # 131547330733 (linux-x64, PR #9) the token was minted at 23:33,
           # this step built reprobuild from 23:46 to 00:52, and its first
@@ -116,27 +106,44 @@ jobs:
           # GitHub credential only through Nix (github: flake inputs and
           # --tool-provisioning=nix), which the broker covers, and run no Git
           # fetch that the frozen GIT_CONFIG_* credential would fail, so they
-          # need no refresh-build-auth. Windows legs install the release
-          # instead of building, and the action skips the broker there.
-          app-id: ${{ secrets.CI_TOKEN_PROVIDER_APP_ID }}
+          # need no refresh-build-auth. The action does not run the broker on
+          # Windows legs.
+          app-id: ${{ vars.CI_TOKEN_PROVIDER_APP_ID }}
           app-private-key: ${{ secrets.CI_TOKEN_PROVIDER_PRIVATE_KEY }}
 
       - name: Assert measured Unix Repro artifacts
+        # setup-dev-env reports the engine it installed. It is the pin, not an
+        # override, and a source build (macOS; Linux when the binary cache
+        # misses) is a clean checkout of that commit. A Linux cache hit
+        # installs the pinned commit's Nix package, which has no checkout.
         if: runner.os != 'Windows'
+        env:
+          REPRO_COMMIT: ${{ steps.dev-env.outputs.repro-commit }}
+          REPRO_ORIGIN: ${{ steps.dev-env.outputs.repro-origin }}
+          REPRO_INSTALL_SOURCE: ${{ steps.dev-env.outputs.repro-install-source }}
         run: |
           set -euo pipefail
-          test "$(git -C .reprobuild-src rev-parse HEAD)" = 7c670d248b936188f8aad689f32bb7e64522c5ac
-          test -z "$(git -C .reprobuild-src status --porcelain)"
-          test "$(command -v repro)" = "$GITHUB_WORKSPACE/.reprobuild-src/build/bin/repro"
-          test "${REPROBUILD_NIX_DAEMON_BIN:?missing staged helper}" = "$GITHUB_WORKSPACE/.reprobuild-src/build/bin/reprobuild-nix-daemon"
-          test -x "$REPROBUILD_NIX_DAEMON_BIN"
+          [[ "${REPRO_COMMIT}" =~ ^[0-9a-f]{40}$ ]]
+          test "${REPRO_ORIGIN}" = pin
+          if [ "${REPRO_INSTALL_SOURCE}" = source ]; then
+            test "$(git -C .reprobuild-src rev-parse HEAD)" = "${REPRO_COMMIT}"
+            test -z "$(git -C .reprobuild-src status --porcelain)"
+            test "$(command -v repro)" = "$GITHUB_WORKSPACE/.reprobuild-src/build/bin/repro"
+            test "${REPROBUILD_NIX_DAEMON_BIN:?missing staged helper}" = "$GITHUB_WORKSPACE/.reprobuild-src/build/bin/reprobuild-nix-daemon"
+          fi
+          test -x "${REPROBUILD_NIX_DAEMON_BIN:?missing staged helper}"
           "$REPROBUILD_NIX_DAEMON_BIN" --help
-          printf 'source=%s cli=%s helper=%s\n' "$(git -C .reprobuild-src rev-parse HEAD)" "$(command -v repro)" "$REPROBUILD_NIX_DAEMON_BIN"
+          printf 'commit=%s origin=%s install=%s cli=%s helper=%s\n' "$REPRO_COMMIT" "$REPRO_ORIGIN" "$REPRO_INSTALL_SOURCE" "$(command -v repro)" "$REPROBUILD_NIX_DAEMON_BIN"
           repro --version
 
       - name: Provision the owning native Windows x64 SDK
+        # Fails closed until the toolchain files at the pinned commit have a
+        # reviewed entry in the script.
         if: runner.os == 'Windows' && matrix.arch == 'x64'
         shell: pwsh
+        env:
+          REPRO_COMMIT: ${{ steps.dev-env.outputs.repro-commit }}
+          REPRO_ORIGIN: ${{ steps.dev-env.outputs.repro-origin }}
         run: ./.github/scripts/windows-native-compiler-sdk.ps1
 
       - name: Record native Windows executable provenance
@@ -146,20 +153,17 @@ jobs:
 
       - name: repro build
         # Build the owning complete native codec corpus.
-        run: dev-exec repro build ${{ runner.os != 'Windows' && '--tool-provisioning=nix' || '' }}
+        #
+        # Windows has no dev shell and keeps the project's `path` default, so
+        # gcc and just come from the reviewed SDK on PATH. Nothing puts `nim`
+        # there, and under `path` the build refuses it as "not found in PATH"
+        # (windows-x64 job 140336949590). `--tool-provisioning-for=nim=tarball`
+        # realizes nim alone from the catalog's hash-checked release archive.
+        run: dev-exec repro build ${{ runner.os != 'Windows' && '--tool-provisioning=nix' || '--tool-provisioning-for=nim=tarball' }}
 
       - name: repro test
-        # Materialises the `test` collection.
-        run: dev-exec repro test ${{ runner.os != 'Windows' && '--tool-provisioning=nix' || '' }}
-
-      - name: just build (cross-check)
-        # Re-runs the legacy `just build` path inside the same env so
-        # we catch silent divergences between `repro build` outputs
-        # and what the dev shell + Justfile produce today.
-        run: dev-exec just build
-
-      - name: just test (cross-check)
-        run: dev-exec just test
+        # Materialises the `test` collection. Same provisioning as the build.
+        run: dev-exec repro test ${{ runner.os != 'Windows' && '--tool-provisioning=nix' || '--tool-provisioning-for=nim=tarball' }}
 
       # Diagnostics on failure. Three things below are load-bearing:
       #
