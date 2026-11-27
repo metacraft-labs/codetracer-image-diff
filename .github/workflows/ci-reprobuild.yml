@@ -45,17 +45,18 @@ jobs:
 
       # Mint a GitHub App installation token via the CI Token Provider
       # app so the reprobuild flake/sibling steps can clone the
-      # organization's access-restricted repositories.  GitHub free plan restricts org-level
-      # secrets with visibility ALL from being readable in private repos,
-      # so we mint per-run tokens from the app secrets stored at repo
-      # level (CI_TOKEN_PROVIDER_APP_ID + CI_TOKEN_PROVIDER_PRIVATE_KEY).
+      # organization's access-restricted repositories. The App ID is read
+      # from the organization Actions variable CI_TOKEN_PROVIDER_APP_ID and
+      # the private key from the organization secret
+      # CI_TOKEN_PROVIDER_PRIVATE_KEY, so no per-repository secret has to
+      # survive a recreation of this repository.
       # Minted before the sibling clones so the workspace-lock manifest
       # checkout (an access-restricted repository) can authenticate.
       - name: Mint installation token for cross-repo sibling clones
         id: ci_token
         uses: actions/create-github-app-token@v2
         with:
-          app-id: ${{ secrets.CI_TOKEN_PROVIDER_APP_ID }}
+          app-id: ${{ vars.CI_TOKEN_PROVIDER_APP_ID }}
           private-key: ${{ secrets.CI_TOKEN_PROVIDER_PRIVATE_KEY }}
           owner: metacraft-labs
 
@@ -107,7 +108,7 @@ jobs:
           # fetch that the frozen GIT_CONFIG_* credential would fail, so they
           # need no refresh-build-auth. The action does not run the broker on
           # Windows legs.
-          app-id: ${{ secrets.CI_TOKEN_PROVIDER_APP_ID }}
+          app-id: ${{ vars.CI_TOKEN_PROVIDER_APP_ID }}
           app-private-key: ${{ secrets.CI_TOKEN_PROVIDER_PRIVATE_KEY }}
 
       - name: Assert measured Unix Repro artifacts
