@@ -1,0 +1,27 @@
+# codetracer.pin -- the codetracer revision this library's downstream lane
+# tests against.
+#
+# One `codetracer=<40-hex sha>` line. .github/workflows/downstream.yml's
+# `resolve` job reads it (scripts/downstream-revision.sh codetracer), unless a
+# manual dispatch names a 40-hex `codetracer_revision`, and hands it to
+# codetracer's reusable image-diff-downstream.yml, which clones codetracer at
+# that commit beside this checkout and runs its image-diff consumers against
+# THIS revision of the library. A branch tip is never used.
+#
+# WHY NOT ci/downstream/repro.lock, as for codetracer-visual-replay
+#   A `uses: "codetracer"` in ci/downstream/repro.nim would fold codetracer's
+#   whole recipe into this solve: its lock pins 43 repositories, every one of
+#   which `repro lock refresh` would have to find checked out to write this
+#   lock, and one of which is this library (codetracer builds against it), so
+#   the lock would also record a second, stale pin of the repository under
+#   test. The lane needs none of that: it clones codetracer alone. So
+#   codetracer is pinned the way codetracer-visual-replay's tests.yml pins its
+#   CI-only siblings, as `<name>=<40-hex sha>` moved by hand, until reprobuild
+#   has a declaration for a sibling that only CI clones.
+#
+# TO MOVE IT: write a PUBLISHED codetracer commit (CI clones it) that carries
+# ci/test/image-diff-consumers.sh and the `test-image-diff-consumers` recipe;
+# the reusable workflow refuses one that does not, and
+# tests/test_downstream_lane.sh fails on one when the codetracer checkout
+# beside this one has the pinned commit.
+codetracer=186829bac7e7c202f29add3fee907cf2d41f266b

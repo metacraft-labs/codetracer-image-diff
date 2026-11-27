@@ -23,6 +23,17 @@ lint: check
 test:
     repro test
 
+# The downstream lane's wiring: .github/workflows/downstream.yml runs on push
+# and pull_request to the mainline, calls codetracer's reusable
+# image-diff-downstream.yml, runs codetracer-visual-replay's image-diff
+# consumers on a GPU runner, and takes each consumer only from ci/downstream
+# (repro.lock, codetracer.pin) or a 40-hex dispatch input, never a branch.
+# Static (bash, grep, sed, awk, git); the lane's resolve job runs it first.
+# Where a consumer is checked out beside this repository, it also checks that
+# the pinned commit carries the consumer's driver.
+test-downstream-lane:
+    bash tests/test_downstream_lane.sh
+
 clean:
     rm -rf nimcache
     rm -f tests/test_flip_identical tests/test_flip_different tests/test_flip_subpixel tests/test_flip_png

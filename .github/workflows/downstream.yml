@@ -1,0 +1,324 @@
+# =============================================================================
+# Downstream tests: this library's consumers against THIS library revision.
+#
+# codetracer-image-diff (NVIDIA FLIP behind a C ABI shim and a Nim API) is
+# compiled from source by its two consumers:
+#
+#   * codetracer-visual-replay (config.nims: `--path:../codetracer-image-diff/src`):
+#     its software-vs-hardware replay tests compare the player's software and
+#     hardware frames with FLIP and assert calibrated thresholds;
+#   * codetracer: its PLAT-37 parity tooling compiles src/flip_wrapper.cpp and
+#     grades through it, tools/story-parity/story_diff.nim imports image_diff,
+#     and flake.nix pins this repository's source as an input.
+#
+# Without this workflow a change here is first run against them when each next
+# moves its pin of this library. One file, two jobs: both consumers are
+# checked on every push and pull request, behind one `resolve` job that checks
+# the lane's wiring and reads both pins.
+#
+# THE TWO JOBS
+#   * codetracer: a thin caller of codetracer's reusable
+#       metacraft-labs/codetracer/.github/workflows/image-diff-downstream.yml
+#     which runs `just test-image-diff-consumers` (ci/test/image-diff-consumers.sh)
+#     there. The `@dev` is the reusable workflow's revision, not the codetracer
+#     that is tested: that one is the pin.
+#   * visual-replay: written out here, not called. visual-replay is a PRIVATE
+#     repository and this one is public, and GitHub lets a private
+#     repository's reusable workflows be called only from other private
+#     repositories. It runs visual-replay's own driver and sibling resolver
+#     at the pinned visual-replay revision, so what it tests is decided by
+#     visual-replay: `just test-image-diff-consumers` compiles every
+#     visual-replay module that imports image_diff against this checkout and
+#     RUNS the FLIP comparisons that replay committed fixtures. The ones that
+#     need a freshly recorded trace, and the calibration tools, are compiled
+#     only; the driver lists each module's class and says why.
+#   Each ends with a `TEST-COUNTS: executed=N passed=N failed=N skipped=N` line
+#   (visual-replay's also prints `COMPILE-COUNTS: compiled=N compile-only=N`)
+#   and fails on any failed test, any compile failure, any unlisted skip, a
+#   missing prerequisite, or none.
+#
+# WHAT IS PINNED, AND BY WHAT
+#   * this repository: `github.sha`, the commit under test;
+#   * codetracer-visual-replay: the revision ci/downstream/repro.lock pins, or
+#     the 40-hex `visual_replay_revision` of a manual dispatch;
+#   * codetracer: the revision ci/downstream/codetracer.pin pins, or the 40-hex
+#     `codetracer_revision` of a manual dispatch;
+#   * every other sibling: the consumer's own pins at that revision
+#     (visual-replay's scripts/image-diff-downstream-siblings.sh);
+#   NEVER a branch tip. The `resolve` job reads both through
+#   scripts/downstream-revision.sh, after tests/test_downstream_lane.sh has
+#   held this file and both pins to all of the above.
+#
+# LANDING ORDER
+#   The consumers' drivers land first, then the pins move to published commits
+#   that carry them (ci/downstream/repro.nim and codetracer.pin say how).
+#   Until then the codetracer job fails at workflow resolution or in its
+#   refusal step, and the visual-replay job in its refusal step: loud
+#   failures, never a pass. This job's contract is held by
+#   tests/test_downstream_lane.sh here, and visual-replay's
+#   tests/test_image_diff_downstream_lane.sh holds the part it provides (that
+#   the refusal step names every file and recipe the job takes from it).
+# =============================================================================
+
+name: downstream
+
+on:
+  push:
+    branches: [main, dev, stable]
+  pull_request:
+    branches: [main, dev, stable]
+  workflow_dispatch:
+    inputs:
+      visual_replay_revision:
+        description: >
+          A codetracer-visual-replay commit (40 hex digits) to test against
+          instead of the one ci/downstream/repro.lock pins. Leave empty to use
+          the lock.
+        required: false
+        default: ""
+        type: string
+      codetracer_revision:
+        description: >
+          A codetracer commit (40 hex digits) to test against instead of the
+          one ci/downstream/codetracer.pin pins. Leave empty to use the pin.
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+# Cancel superseded PR runs only: a new push to a PR makes its previous run
+# moot, and stale runs otherwise hold scarce self-hosted runners. Every other
+# event gets a group unique to its run_id, so it is never cancelled and never
+# cancels anything.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Cargo fetches its git dependencies through the git CLI, the only
+  # transport the job's Git credential reaches.
+  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+
+jobs:
+  resolve:
+    name: Resolve the consumer revisions
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 10
+    outputs:
+      visual-replay-rev: ${{ steps.vr.outputs.rev }}
+      codetracer-rev: ${{ steps.ct.outputs.rev }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Check the downstream lane's wiring
+        # Static (bash, grep, sed, awk): this file, both pins and the resolver.
+        run: bash tests/test_downstream_lane.sh
+
+      - name: Read the visual-replay pin
+        id: vr
+        shell: bash
+        env:
+          INPUT_REV: ${{ github.event.inputs.visual_replay_revision }}
+        run: bash scripts/downstream-revision.sh codetracer-visual-replay "${INPUT_REV}" >>"${GITHUB_OUTPUT}"
+
+      - name: Read the codetracer pin
+        id: ct
+        shell: bash
+        env:
+          INPUT_REV: ${{ github.event.inputs.codetracer_revision }}
+        run: bash scripts/downstream-revision.sh codetracer "${INPUT_REV}" >>"${GITHUB_OUTPUT}"
+
+  codetracer:
+    name: codetracer image-diff consumers
+    needs: resolve
+    uses: metacraft-labs/codetracer/.github/workflows/image-diff-downstream.yml@dev
+    with:
+      codetracer-revision: ${{ needs.resolve.outputs.codetracer-rev }}
+    # `inherit`: the CI Token Provider App ID is a repository VARIABLE here and
+    # a SECRET elsewhere in the org, and the reusable workflow accepts either.
+    secrets: inherit
+
+  visual-replay:
+    name: visual-replay image-diff consumers
+    needs: resolve
+    # A GPU runner: the software-vs-hardware comparisons replay each fixture on
+    # the player's hardware backend too, and the Vulkan ones refuse a CPU
+    # device for it. It is the label visual-replay's own tests.yml runs these
+    # suites on.
+    runs-on: [self-hosted, gpu]
+    # Building the replay companion (a Cargo build) dominates on a cold runner.
+    timeout-minutes: 180
+    steps:
+      - name: Plan the workspace layout
+        # The revision is validated here, before anything is cloned. Inputs
+        # reach the script through `env:`, never by `${{ }}` interpolation
+        # into its body.
+        id: plan
+        shell: bash
+        env:
+          VR_REV: ${{ needs.resolve.outputs.visual-replay-rev }}
+          SELF_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          SELF="${GITHUB_REPOSITORY##*/}"
+          if ! [[ "${VR_REV}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::the visual-replay revision must be a 40-hex commit (got '${VR_REV}'). The resolve job reads it from ci/downstream/repro.lock or an explicit 40-hex dispatch input; this lane never tests a branch tip."
+            exit 1
+          fi
+          PARENT="$(cd "${GITHUB_WORKSPACE}/.." && pwd)"
+          VR_DIR="${PARENT}/codetracer-visual-replay"
+          echo "library under test (primary): ${SELF} @ ${SELF_SHA}"
+          echo "visual-replay revision:       ${VR_REV}"
+          echo "visual-replay checkout:       ${VR_DIR}"
+          echo "- library under test: \`${SELF}@${SELF_SHA}\`; codetracer-visual-replay: \`${VR_REV}\`" >>"${GITHUB_STEP_SUMMARY}"
+          {
+            echo "self=${SELF}"
+            echo "vr-dir=${VR_DIR}"
+            echo "vr-rev=${VR_REV}"
+          } >>"${GITHUB_OUTPUT}"
+
+      - name: Mint installation token for cross-repo sibling access
+        # visual-replay and several of its siblings are private.
+        id: ci_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.CI_TOKEN_PROVIDER_APP_ID || vars.CI_TOKEN_PROVIDER_APP_ID }}
+          private-key: ${{ secrets.CI_TOKEN_PROVIDER_PRIVATE_KEY }}
+          owner: metacraft-labs
+
+      - name: Checkout the library under test (the workspace root)
+        # The pushed commit, or the pull request's merge commit.
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          token: ${{ steps.ci_token.outputs.token }}
+          # setup-dev-env gives every later git call a credential; a second
+          # persisted one makes GitHub refuse the request ("Duplicate header").
+          persist-credentials: false
+
+      - name: Clone codetracer-visual-replay at that revision
+        # The directory and revision reach the script through `env:` (git-auth
+        # runs it with the step's environment), never as `${{ }}` text in it.
+        uses: metacraft-labs/metacraft-github-actions/git-auth@a190f3a8b37c5a239d88b8c964b6d13f64fbaa0d
+        env:
+          VR_DIR: ${{ steps.plan.outputs.vr-dir }}
+          VR_REV: ${{ steps.plan.outputs.vr-rev }}
+        with:
+          gh-token: ${{ steps.ci_token.outputs.token }}
+          working-directory: ${{ github.workspace }}
+          run: |
+            set -euo pipefail
+            rm -rf "${VR_DIR}"
+            git init -q "${VR_DIR}"
+            git -C "${VR_DIR}" remote add origin https://github.com/metacraft-labs/codetracer-visual-replay
+            git -C "${VR_DIR}" fetch -q --depth 1 origin "${VR_REV}"
+            git -C "${VR_DIR}" -c advice.detachedHead=false checkout -q FETCH_HEAD
+            got="$(git -C "${VR_DIR}" rev-parse HEAD)"
+            [ "${got}" = "${VR_REV}" ] || { echo "::error::fetched codetracer-visual-replay ${got}, not ${VR_REV}"; exit 1; }
+            echo "codetracer-visual-replay at ${got}"
+
+      - name: Refuse a visual-replay revision that predates this lane
+        # A pin that is too old fails here, by name, instead of as `No such
+        # file or directory` after the dev shell.
+        shell: bash
+        env:
+          VR_DIR: ${{ steps.plan.outputs.vr-dir }}
+        run: |
+          set -euo pipefail
+          for script in scripts/image-diff-consumers.sh scripts/image-diff-downstream-siblings.sh \
+                        scripts/downstream-lane-lib.sh scripts/downstream-siblings-lib.sh \
+                        scripts/install-native-replay-companion.sh tests/test_image_diff_downstream_lane.sh; do
+            if [ ! -f "${VR_DIR}/${script}" ]; then
+              echo "::error::the visual-replay revision under test ($(git -C "${VR_DIR}" rev-parse HEAD)) predates ${script}, which this lane runs. Move the pin in ci/downstream/repro.lock (or the dispatch input) to a revision that carries it."
+              exit 1
+            fi
+            echo "  OK   ${VR_DIR}/${script}"
+          done
+          for recipe in test-image-diff-consumers install-native-replay-companion; do
+            if ! grep -q "^${recipe}" "${VR_DIR}/Justfile"; then
+              echo "::error::the visual-replay revision under test has no '${recipe}' recipe; move the pin forward."
+              exit 1
+            fi
+          done
+
+      - name: Check the consumer half of the lane's wiring at that revision
+        # Static (bash, grep, sed, awk): the driver's and the sibling
+        # resolver's refusals, as committed at the revision under test.
+        shell: bash
+        env:
+          VR_DIR: ${{ steps.plan.outputs.vr-dir }}
+        run: bash "${VR_DIR}/tests/test_image_diff_downstream_lane.sh"
+
+      - name: Resolve the siblings from visual-replay's own pins
+        id: resolve
+        shell: bash
+        env:
+          VR_DIR: ${{ steps.plan.outputs.vr-dir }}
+        run: |
+          set -euo pipefail
+          siblings="$(bash "${VR_DIR}/scripts/image-diff-downstream-siblings.sh")"
+          printf '%s\n' "${siblings}"
+          {
+            echo "siblings<<IMAGE_DIFF_DOWNSTREAM_EOF"
+            printf '%s\n' "${siblings}"
+            echo "IMAGE_DIFF_DOWNSTREAM_EOF"
+          } >>"${GITHUB_OUTPUT}"
+
+      - name: Setup dev env + clone the siblings
+        # Every entry is `<name>=<40-hex>`, so nothing is read from this
+        # repository's lock (which pins none of them). The calling repo is
+        # listed too: clone-siblings skips an entry naming the triggering
+        # repository, and it keeps the list non-empty.
+        uses: metacraft-labs/metacraft-github-actions/setup-dev-env@dev
+        with:
+          env-flavor: nix
+          gh-token: ${{ steps.ci_token.outputs.token }}
+          # The job outlives the token's hour; with the App's id and key the
+          # credential broker re-mints the Nix GitHub credential in place.
+          app-id: ${{ secrets.CI_TOKEN_PROVIDER_APP_ID || vars.CI_TOKEN_PROVIDER_APP_ID }}
+          app-private-key: ${{ secrets.CI_TOKEN_PROVIDER_PRIVATE_KEY }}
+          substituters: ${{ vars.ATTIC_SUBSTITUTER }}
+          trusted-public-keys: ${{ vars.ATTIC_TRUSTED_PUBLIC_KEY }}
+          # The substituter is private: without its token nix reads it
+          # anonymously, gets 401 and builds from source.
+          attic-token: ${{ secrets.ATTIC_TOKEN }}
+          attic-cache: ${{ vars.ATTIC_CACHE }}
+          siblings: |
+            ${{ steps.plan.outputs.self }}
+            ${{ steps.resolve.outputs.siblings }}
+
+      - name: Build the ct-native-replay companion
+        # The replay tests need it. A step of its own: it is the long one, and
+        # the Git credential is refreshed after it.
+        shell: bash
+        env:
+          VR_DIR: ${{ steps.plan.outputs.vr-dir }}
+        run: |
+          set -euo pipefail
+          cd "${VR_DIR}"
+          nix develop --no-update-lock-file --command just install-native-replay-companion
+
+      - name: Refresh the Git credential
+        uses: metacraft-labs/metacraft-github-actions/refresh-build-auth@dev
+        with:
+          app-id: ${{ secrets.CI_TOKEN_PROVIDER_APP_ID || vars.CI_TOKEN_PROVIDER_APP_ID }}
+          private-key: ${{ secrets.CI_TOKEN_PROVIDER_PRIVATE_KEY }}
+
+      - name: Run visual-replay's image-diff consumers against this library
+        # The driver's COMPILE-COUNTS and TEST-COUNTS lines end this step's log;
+        # it exits non-zero on any failed test, compile failure, unlisted
+        # skip, missing prerequisite, or none. --expect-image-diff-rev holds it to the
+        # commit checked out above.
+        shell: bash
+        env:
+          VR_DIR: ${{ steps.plan.outputs.vr-dir }}
+          SELF_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          cd "${VR_DIR}"
+          nix develop --no-update-lock-file --command \
+            just test-image-diff-consumers --expect-image-diff-rev "${SELF_SHA}"

@@ -10,6 +10,8 @@ result-*
 # Compiled tests
 tests/test_*
 !tests/test_*.nim
+# Shell tests are sources too (the downstream lane's wiring test).
+!tests/test_*.sh
 !tests/test_*.nim.cfg
 
 # repro build outputs (repro.nim TestSpec binaries in build/test-bin/,
