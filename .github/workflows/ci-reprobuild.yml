@@ -153,11 +153,17 @@ jobs:
 
       - name: repro build
         # Build the owning complete native codec corpus.
-        run: dev-exec repro build ${{ runner.os != 'Windows' && '--tool-provisioning=nix' || '' }}
+        #
+        # Windows has no dev shell and keeps the project's `path` default, so
+        # gcc and just come from the reviewed SDK on PATH. Nothing puts `nim`
+        # there, and under `path` the build refuses it as "not found in PATH"
+        # (windows-x64 job 140336949590). `--tool-provisioning-for=nim=tarball`
+        # realizes nim alone from the catalog's hash-checked release archive.
+        run: dev-exec repro build ${{ runner.os != 'Windows' && '--tool-provisioning=nix' || '--tool-provisioning-for=nim=tarball' }}
 
       - name: repro test
-        # Materialises the `test` collection.
-        run: dev-exec repro test ${{ runner.os != 'Windows' && '--tool-provisioning=nix' || '' }}
+        # Materialises the `test` collection. Same provisioning as the build.
+        run: dev-exec repro test ${{ runner.os != 'Windows' && '--tool-provisioning=nix' || '--tool-provisioning-for=nim=tarball' }}
 
       # Diagnostics on failure. Three things below are load-bearing:
       #
